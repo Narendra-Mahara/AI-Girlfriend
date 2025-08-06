@@ -22,6 +22,29 @@ const App = () => {
               ? "cursor-not-allowed transition-none hover:bg-gray-500 "
               : "cursor-pointer hover:scale-105 "
           }`}
+          onClick={() => {
+            setIsSpeaking(true);
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false; // stop listening if user stops speaking
+            recognition.lang = "en-US";
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+            recognition.start();
+
+            // Execute if there is error in Recognition
+            recognition.addEventListener("error", (event) => {
+              console.error(
+                `Speech recognition error detected: ${event.error}`
+              );
+              setIsSpeaking(false);
+            });
+
+            recognition.addEventListener("result", (event) => {
+              const result = event.results[0][0].transcript;
+              console.log(result);
+              setIsSpeaking(false);
+            });
+          }}
         >
           {isSpeaking ? (
             <>

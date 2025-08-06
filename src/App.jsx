@@ -44,8 +44,29 @@ const App = () => {
     );
     let actualText = response.data.candidates[0].content.parts[0].text;
 
+    textToSpeech(actualText);
     setGeminiResponse((prevResponse) => [...prevResponse, actualText]);
-    console.log(actualText);
+  };
+
+  const textToSpeech = (message) => {
+    console.log("Generating speech for:", message);
+
+    let utterance = new SpeechSynthesisUtterance(message);
+
+    // Make voice calm and beautiful
+    utterance.rate = 1;
+    utterance.pitch = 1.3;
+    utterance.volume = 0.9;
+
+    utterance.onstart = () => {
+      console.log("Speech started");
+    };
+
+    utterance.onend = () => {
+      console.log("Speech ended");
+    };
+
+    speechSynthesis.speak(utterance);
   };
   return (
     <div className="min-h-svh p-5 flex flex-col gap-5">
@@ -103,9 +124,32 @@ const App = () => {
           )}
         </button>
       </div>
-
-      <div className="border border-black min-h-7 mt-20 font-mono p-5 rounded-sm text-center">
-        Nothing to show..
+      <div
+        className={`border border-black min-h-7 mt-20 font-mono p-5 rounded-sm  ${
+          userInput.length == 0 && "text-center"
+        }`}
+      >
+        {userInput.length == 0 ? (
+          "   Nothing to show...."
+        ) : (
+          <div className="space-y-4">
+            {userInput.map((input, index) => (
+              <div
+                key={index}
+                className="border-b border-gray-200 pb-3 last:border-b-0"
+              >
+                <p className="mb-2">
+                  <b>You:</b> {input}
+                </p>
+                {geminiResponse[index] && (
+                  <p>
+                    <b>Gemini:</b> {geminiResponse[index]}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

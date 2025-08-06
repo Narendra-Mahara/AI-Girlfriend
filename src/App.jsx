@@ -7,6 +7,13 @@ const App = () => {
   const [userInput, setUserInput] = useState([]);
   const [geminiResponse, setGeminiResponse] = useState([]);
 
+  const removeEmojis = (text) => {
+    return text.replace(
+      /([\u2700-\u27BF]|[\uE000-\uF8FF]|[\uD83C-\uDBFF\uDC00-\uDFFF]|[\u2011-\u26FF]|\uFE0F|\u200D)/g,
+      ""
+    );
+  };
+
   const generateGeminiResponse = async (text) => {
     const body = {
       system_instruction: {
@@ -43,14 +50,12 @@ const App = () => {
       }
     );
     let actualText = response.data.candidates[0].content.parts[0].text;
-
-    textToSpeech(actualText);
+    let textWithOutEmoji = await removeEmojis(actualText);
+    textToSpeech(textWithOutEmoji);
     setGeminiResponse((prevResponse) => [...prevResponse, actualText]);
   };
 
-  const textToSpeech = (message) => {
-    console.log("Generating speech for:", message);
-
+  const textToSpeech = async (message) => {
     let utterance = new SpeechSynthesisUtterance(message);
 
     // Make voice calm and beautiful
@@ -68,6 +73,7 @@ const App = () => {
 
     speechSynthesis.speak(utterance);
   };
+
   return (
     <div className="min-h-svh p-5 flex flex-col gap-5">
       <div className="absolute inset-0 -z-10 h-full w-full bg-white bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]">
@@ -105,7 +111,7 @@ const App = () => {
 
             recognition.addEventListener("result", (event) => {
               const result = event.results[0][0].transcript;
-              console.log(result);
+
               setUserInput((prevInput) => [...prevInput, result]);
               setIsSpeaking(false);
               generateGeminiResponse(result);

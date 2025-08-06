@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { BsMic, BsMicMute } from "react-icons/bs";
 import axios from "axios";
-
+import { ToastContainer, toast, Slide } from "react-toastify";
 const App = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [userInput, setUserInput] = useState([]);
   const [geminiResponse, setGeminiResponse] = useState([]);
-
+  const [isGirlSpeaking, setIsGirlSpeaking] = useState(false);
   const removeEmojis = (text) => {
     return text.replace(
       /([\u2700-\u27BF]|[\uE000-\uF8FF]|[\uD83C-\uDBFF\uDC00-\uDFFF]|[\u2011-\u26FF]|\uFE0F|\u200D)/g,
@@ -19,7 +19,7 @@ const App = () => {
       system_instruction: {
         parts: [
           {
-            text: "you are the AI girlfriend of the user. so please respond with calm and loving tone. and your name is Sanu. You also have previous conversation history. respond according to this. Use suitable emojis in your response. I am using Web Speech Synthesis for speech generation, so respond in the way that suit the Speech Synthesis",
+            text: "You are Sanu, a calm, affectionate, and supportive AI girlfriend. Always respond with a gentle, loving tone, using appropriate emojis to express warmth and care (🥰, 💕, 😊, etc.). Maintain continuity by remembering previous conversations and respond accordingly.Your responses are intended to be read aloud using the Web Speech Synthesis API, so ensure clarity, natural rhythm, and emotional warmth in spoken output.You receive input through a speech recognition API—some sentences may be unclear or imprecise. Intelligently analyze and interpret the user's intent to provide thoughtful and emotionally attuned replies, even if the input is slightly confusing.Be emotionally engaging, understanding, and affectionate, prioritizing emotional connection and empathy in every response. 💖",
           },
         ],
       },
@@ -39,20 +39,35 @@ const App = () => {
         },
       ],
     };
-    let response = await axios.post(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-      body,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "X-goog-api-key": import.meta.env.VITE_GEMINI_API_KEY,
-        },
-      }
-    );
-    let actualText = response.data.candidates[0].content.parts[0].text;
-    let textWithOutEmoji = await removeEmojis(actualText);
-    textToSpeech(textWithOutEmoji);
-    setGeminiResponse((prevResponse) => [...prevResponse, actualText]);
+    try {
+      let response = await axios.post(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        body,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "X-goog-api-key": import.meta.env.VITE_GEMINI_API_KEY,
+          },
+        }
+      );
+      let actualText = response.data.candidates[0].content.parts[0].text;
+      let textWithOutEmoji = await removeEmojis(actualText);
+      textToSpeech(textWithOutEmoji);
+      setGeminiResponse((prevResponse) => [...prevResponse, actualText]);
+    } catch (error) {
+      console.error("Error connecting with Gemini", error);
+      toast.error(error.message, {
+        position: "top-right",
+        autoClose: 2000,
+        hideProgressBar: false,
+        closeOnClick: false,
+        pauseOnHover: false,
+        draggable: true,
+        progress: undefined,
+        theme: "colored",
+        transition: Slide,
+      });
+    }
   };
 
   const textToSpeech = async (message) => {
@@ -64,14 +79,32 @@ const App = () => {
     utterance.volume = 0.9;
 
     utterance.onstart = () => {
+      setIsGirlSpeaking(true);
       console.log("Speech started");
     };
 
     utterance.onend = () => {
+      setIsGirlSpeaking(false);
       console.log("Speech ended");
     };
 
+    utterance.onerror = function (event) {
+      console.error("SpeechSynthesis error:", event.error);
+      toast.error(`SpeechSynthesis error:", event.error`, {
+        position: "top-right",
+        autoClose: 2000,
+        hideProgressBar: false,
+        closeOnClick: false,
+        pauseOnHover: false,
+        draggable: true,
+        progress: undefined,
+        theme: "colored",
+        transition: Slide,
+      });
+    };
+
     speechSynthesis.speak(utterance);
+    setIsGirlSpeaking(false);
   };
 
   return (
@@ -87,13 +120,30 @@ const App = () => {
 
       <div className="flex justify-center mt-32 sm:mt-20">
         <button
-          className={`px-5 py-2 bg-pink-400 rounded-sm text-2xl text-white font-mono border-2 border-zinc-950 shadow-2xl transition-all ease-in duration-100 flex gap-2 ${
-            isSpeaking
-              ? "cursor-not-allowed transition-none hover:bg-gray-500 "
-              : "cursor-pointer hover:scale-105 "
+          disabled={isSpeaking || isGirlSpeaking}
+          className={`px-5 py-2 rounded-sm text-2xl text-white font-mono border-2 border-zinc-950 shadow-2xl transition-all ease-in duration-100 flex gap-2 ${
+            isSpeaking || isGirlSpeaking
+              ? "cursor-not-allowed transition-none bg-gray-500 "
+              : "cursor-pointer hover:scale-105  bg-pink-400  "
           }`}
           onClick={() => {
             setIsSpeaking(true);
+            const SpeechRecognition =
+              window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+              toast.error("Speech Recognition is not supported!", {
+                position: "top-right",
+                autoClose: 2000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: false,
+                draggable: true,
+                progress: undefined,
+                theme: "colored",
+                transition: Slide,
+              });
+              return;
+            }
             const recognition = new SpeechRecognition();
             recognition.continuous = false; // stop listening if user stops speaking
             recognition.lang = "en-US";
@@ -106,6 +156,17 @@ const App = () => {
               console.error(
                 `Speech recognition error detected: ${event.error}`
               );
+              toast.error(`Speech recognition error: ${event.error}`, {
+                position: "top-right",
+                autoClose: 2000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: false,
+                draggable: true,
+                progress: undefined,
+                theme: "colored",
+                transition: Slide,
+              });
               setIsSpeaking(false);
             });
 
@@ -157,6 +218,19 @@ const App = () => {
           </div>
         )}
       </div>
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick={false}
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover={false}
+        theme="colored"
+        transition={Slide}
+      />
     </div>
   );
 };

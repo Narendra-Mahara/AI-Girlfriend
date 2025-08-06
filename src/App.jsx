@@ -1,9 +1,52 @@
 import { useState } from "react";
 import { BsMic, BsMicMute } from "react-icons/bs";
+import axios from "axios";
 
 const App = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [userInput, setUserInput] = useState([]);
+  const [geminiResponse, setGeminiResponse] = useState([]);
 
+  const generateGeminiResponse = async (text) => {
+    const body = {
+      system_instruction: {
+        parts: [
+          {
+            text: "you are the AI girlfriend of the user. so please respond with calm and loving tone. and your name is Sanu. You also have previous conversation history. respond according to this. Use suitable emojis in your response. I am using Web Speech Synthesis for speech generation, so respond in the way that suit the Speech Synthesis",
+          },
+        ],
+      },
+      contents: [
+        {
+          parts: [
+            {
+              text:
+                "User history:" +
+                userInput +
+                "Your history" +
+                geminiResponse +
+                "Current message:" +
+                text,
+            },
+          ],
+        },
+      ],
+    };
+    let response = await axios.post(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      body,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "X-goog-api-key": import.meta.env.VITE_GEMINI_API_KEY,
+        },
+      }
+    );
+    let actualText = response.data.candidates[0].content.parts[0].text;
+
+    setGeminiResponse((prevResponse) => [...prevResponse, actualText]);
+    console.log(actualText);
+  };
   return (
     <div className="min-h-svh p-5 flex flex-col gap-5">
       <div className="absolute inset-0 -z-10 h-full w-full bg-white bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]">
@@ -42,7 +85,9 @@ const App = () => {
             recognition.addEventListener("result", (event) => {
               const result = event.results[0][0].transcript;
               console.log(result);
+              setUserInput((prevInput) => [...prevInput, result]);
               setIsSpeaking(false);
+              generateGeminiResponse(result);
             });
           }}
         >

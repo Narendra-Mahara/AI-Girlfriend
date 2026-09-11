@@ -7,10 +7,11 @@ const App = () => {
   const [userInput, setUserInput] = useState([]);
   const [geminiResponse, setGeminiResponse] = useState([]);
   const [isGirlSpeaking, setIsGirlSpeaking] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const removeEmojis = (text) => {
     return text.replace(
       /([\u2700-\u27BF]|[\uE000-\uF8FF]|[\uD83C-\uDBFF\uDC00-\uDFFF]|[\u2011-\u26FF]|\uFE0F|\u200D)/g,
-      ""
+      "",
     );
   };
 
@@ -41,19 +42,20 @@ const App = () => {
     };
     try {
       let response = await axios.post(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent",
         body,
         {
           headers: {
             "Content-Type": "application/json",
             "X-goog-api-key": import.meta.env.VITE_GEMINI_API_KEY,
           },
-        }
+        },
       );
       let actualText = response.data.candidates[0].content.parts[0].text;
-      let textWithOutEmoji = await removeEmojis(actualText);
-      textToSpeech(textWithOutEmoji);
+      const textWithoutEmoji = removeEmojis(actualText);
+
       setGeminiResponse((prevResponse) => [...prevResponse, actualText]);
+      await textToSpeech(textWithoutEmoji);
     } catch (error) {
       console.error("Error connecting with Gemini", error);
       toast.error(error.message, {
@@ -67,45 +69,34 @@ const App = () => {
         theme: "colored",
         transition: Slide,
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const textToSpeech = async (message) => {
-    let utterance = new SpeechSynthesisUtterance(message);
+  const textToSpeech = (message) =>
+    new Promise((resolve) => {
+      const utterance = new SpeechSynthesisUtterance(message);
 
-    // Make voice calm and beautiful
-    utterance.rate = 1;
-    utterance.pitch = 1.3;
-    utterance.volume = 0.9;
+      utterance.rate = 1;
+      utterance.pitch = 1.3;
+      utterance.volume = 0.9;
 
-    utterance.onstart = () => {
       setIsGirlSpeaking(true);
-      console.log("Speech started");
-    };
 
-    utterance.onend = () => {
-      setIsGirlSpeaking(false);
-      console.log("Speech ended");
-    };
+      utterance.onend = () => {
+        setIsGirlSpeaking(false);
+        resolve();
+      };
 
-    utterance.onerror = function (event) {
-      console.error("SpeechSynthesis error:", event.error);
-      toast.error(`SpeechSynthesis error:", event.error`, {
-        position: "top-right",
-        autoClose: 2000,
-        hideProgressBar: false,
-        closeOnClick: false,
-        pauseOnHover: false,
-        draggable: true,
-        progress: undefined,
-        theme: "colored",
-        transition: Slide,
-      });
-    };
+      utterance.onerror = (event) => {
+        setIsGirlSpeaking(false);
+        console.error("SpeechSynthesis error:", event.error);
+        resolve();
+      };
 
-    speechSynthesis.speak(utterance);
-    setIsGirlSpeaking(false);
-  };
+      speechSynthesis.speak(utterance);
+    });
 
   return (
     <div className="min-h-svh p-5 flex flex-col gap-5">
@@ -120,9 +111,9 @@ const App = () => {
 
       <div className="flex justify-center mt-32 sm:mt-20">
         <button
-          disabled={isSpeaking || isGirlSpeaking}
+          disabled={isSpeaking || isGirlSpeaking || isProcessing}
           className={`px-5 py-2 rounded-sm text-2xl text-white font-mono border-2 border-zinc-950 shadow-2xl transition-all ease-in duration-100 flex gap-2 ${
-            isSpeaking || isGirlSpeaking
+            isSpeaking || isGirlSpeaking || isProcessing
               ? "cursor-not-allowed transition-none bg-gray-500 "
               : "cursor-pointer hover:scale-105  bg-pink-400  "
           }`}
@@ -154,7 +145,7 @@ const App = () => {
             // Execute if there is error in Recognition
             recognition.addEventListener("error", (event) => {
               console.error(
-                `Speech recognition error detected: ${event.error}`
+                `Speech recognition error detected: ${event.error}`,
               );
               toast.error(`Speech recognition error: ${event.error}`, {
                 position: "top-right",
@@ -175,6 +166,7 @@ const App = () => {
 
               setUserInput((prevInput) => [...prevInput, result]);
               setIsSpeaking(false);
+              setIsProcessing(true);
               generateGeminiResponse(result);
             });
           }}
